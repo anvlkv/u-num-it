@@ -4,15 +4,17 @@ authors = ["a.nvlkv <a.nvlkv@protonmail.ch>"]
 repository = "https://github.com/anvlkv/u-num-it"
 edition = "2021"
 version = "0.1.0"
-license = "CC0 1.0 Universal"
+license = "MIT"
 rust-version = "1.67"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-typenum = "1.17.0"
 syn = { version = "2.0", features = ["parsing", "full"] }
 quote = "1.0"
 eval = "0.4.3"
 proc-macro2 = "1.0.79"
+
+[dev-dependencies]
+typenum = "1"
