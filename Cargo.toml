@@ -12,5 +12,7 @@ proc-macro = true
 
 [dependencies]
 typenum = "1.17.0"
-syn = "2.0"
+syn = { version = "2.0", features = ["parsing", "full"] }
 quote = "1.0"
+eval = "0.4.3"
+proc-macro2 = "1.0.79"
