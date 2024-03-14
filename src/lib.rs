@@ -39,7 +39,7 @@ struct UNumIt {
 
 fn range_boundary(val: &Option<Box<Expr>>) -> syn::Result<Option<isize>> {
     if let Some(val) = val.clone() {
-        let string = val.to_token_stream().to_string().replace(" ", "");
+        let string = val.to_token_stream().to_string().replace(' ', "");
         let value = string
             .parse::<isize>()
             .map_err(|e| syn::Error::new(val.span(), format!("{e}: `{string}`").as_str()))?;
@@ -85,7 +85,7 @@ impl Parse for UNumIt {
                 _ => return Err(syn::Error::new(arm.pat.span(), "exepected ident")),
             };
             let arm_expr = arm.body.clone();
-            if let Some(_) = arms.insert(u_type, arm_expr.clone()) {
+            if arms.insert(u_type, arm_expr.clone()).is_some() {
                 return Err(syn::Error::new(arm_expr.span(), "duplicate type"));
             }
         }
@@ -108,8 +108,8 @@ fn make_body_variant(body: TokenStream, type_variant: TokenStream, u_type: UType
         let type_variant = type_variant.clone();
         match token {
             TokenTree::Ident(ref ident) => {
-                if ident.to_string() == u_type.to_string() {
-                    acc.extend(quote!(#type_variant).to_token_stream().into_iter());
+                if *ident == u_type.to_string() {
+                    acc.extend(quote!(#type_variant).to_token_stream());
                 } else {
                     acc.push(token);
                 }
@@ -126,7 +126,7 @@ fn make_body_variant(body: TokenStream, type_variant: TokenStream, u_type: UType
     quote! {#(#tokens)*}
 }
 
-fn make_match_arm(i: &isize, body: &Box<Expr>, u_type: UType) -> TokenStream {
+fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     let i_str = if *i != 0 {
         i.abs().to_string()
     } else {
