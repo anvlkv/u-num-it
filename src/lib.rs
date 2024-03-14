@@ -147,6 +147,25 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     }
 }
 
+/// matches `typenum::consts` in a given range
+///
+/// use with an open or closed range
+///
+/// use `P` | `N` | `U` | `False` | `_` as match arms
+///
+/// ## Example
+///
+/// ```
+/// let x = 3;
+///
+/// u_num_it::u_num_it!(1..10, match x {
+///     U => {
+///         let val = U::new();
+///         println!("{:?}", val);
+///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
+///     }
+/// })
+/// ```
 #[proc_macro]
 pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let UNumIt { range, arms, expr } = parse_macro_input!(tokens as UNumIt);
