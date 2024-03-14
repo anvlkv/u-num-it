@@ -1,0 +1,16 @@
+[package]
+name = "u-num-it"
+authors = ["a.nvlkv <a.nvlkv@protonmail.ch>"]
+repository = "https://github.com/anvlkv/u-num-it"
+edition = "2021"
+version = "0.1.0"
+license = "CC0 1.0 Universal"
+rust-version = "1.67"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+typenum = "1.17.0"
+syn = "2.0"
+quote = "1.0"
