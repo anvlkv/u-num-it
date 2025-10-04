@@ -182,9 +182,9 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///
 /// use with an open or closed range
 ///
-/// use `P` | `N` | `U` | `False` | `_` as match arms
+/// use `P` | `N` | `U` | `False` | `_` or literals `1` | `-1` as match arms
 ///
-/// As of version 0.2.1, a `NumType` type alias is available in each match arm,
+/// a `NumType` type alias is available in each match arm,
 /// resolving to the specific typenum type for that value.
 ///
 /// ## Example
