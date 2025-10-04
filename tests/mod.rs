@@ -10,7 +10,7 @@ fn u_macro_test() {
             1..=10,
             match i {
                 U => {
-                    let inner: usize = U::to_int();
+                    let inner: usize = NumType::to_int();
                     assert_eq!(inner, i);
                 }
             }
@@ -25,17 +25,17 @@ fn i_macro_test() {
             -5..5,
             match i {
                 N => {
-                    let inner: i32 = N::to_int();
+                    let inner: i32 = NumType::to_int();
                     assert_eq!(inner, i);
                     assert!(inner < 0);
                 },
                 P => {
-                    let inner: i32 = P::to_int();
+                    let inner: i32 = NumType::to_int();
                     assert_eq!(inner, i);
                     assert!(inner > 0);
                 },
                 False => {
-                    let inner: u8 = False::to_u8();
+                    let inner: u8 = NumType::to_u8();
                     assert_eq!(inner, i as u8);
                     assert!(inner == 0);
                 }

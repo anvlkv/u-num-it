@@ -9,13 +9,13 @@ let x:isize = 3;
 
 u_num_it!(-5..5, match x {
     N => {
-        N::new()
+        NumType::new()
     },
     False => {
-        False::new()
+        NumType::new()
     },
     P => {
-        P::new()
+        NumType::new()
     }
 })
 ```
@@ -66,10 +66,10 @@ match x {
 ```rust
 u_num_it!(-5..5, match x {
     N => {
-        N::new()
+        NumType::new()
     },
     False => {
-        False::new()
+        NumType::new()
     },
     P => {
         // NumType is typenum::consts::P3 when x is 3

@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use std::{collections::HashMap, str::FromStr};
 
-use proc_macro2::{Group, Literal, Span, TokenStream, TokenTree};
+use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 
 use quote::{quote, ToTokens};
 use syn::{
@@ -121,29 +121,6 @@ impl Parse for UNumIt {
     }
 }
 
-fn make_body_variant(body: TokenStream, type_variant: TokenStream, u_type: UType) -> TokenStream {
-    let tokens = body.into_iter().fold(vec![], |mut acc, token| {
-        let type_variant = type_variant.clone();
-        match token {
-            TokenTree::Ident(ref ident) => {
-                if *ident == u_type.to_string() {
-                    acc.extend(quote!(#type_variant).to_token_stream());
-                } else {
-                    acc.push(token);
-                }
-            }
-            TokenTree::Group(ref group) => {
-                let inner = make_body_variant(group.stream(), type_variant, u_type);
-                acc.push(TokenTree::Group(Group::new(group.delimiter(), inner)));
-            }
-            _ => acc.push(token),
-        };
-        acc
-    });
-
-    quote! {#(#tokens)*}
-}
-
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
     
@@ -168,24 +145,13 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     ));
     let type_variant = quote!(typenum::consts::#typenum_type);
     
-    // For literal types, use the body as-is without type replacement
-    if let UType::Literal(_) = u_type {
-        let body_tokens = body.to_token_stream();
-        return quote! {
-            #match_expr => {
-                type NumType = #type_variant;
-                #body_tokens
-            },
-        };
-    }
+    // All match arms get NumType and use body as-is (no pattern replacement)
+    let body_tokens = body.to_token_stream();
     
-    // For type patterns (N, P, U, False), perform type replacement
-    let body_variant = make_body_variant(body.to_token_stream(), type_variant.clone(), u_type);
-
     quote! {
         #match_expr => {
             type NumType = #type_variant;
-            #body_variant
+            #body_tokens
         },
     }
 }
@@ -198,6 +164,7 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///
 /// a `NumType` type alias is available in each match arm,
 /// resolving to the specific typenum type for that value.
+/// Use `NumType` to reference the resolved type in the match arm body.
 ///
 /// ## Example
 ///
@@ -206,12 +173,11 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///
 /// u_num_it::u_num_it!(1..10, match x {
 ///     U => {
-///         let val = U::new();
+///         // NumType is typenum::consts::U3 when x=3
+///         let val = NumType::new();
 ///         println!("{:?}", val);
 ///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
 ///         
-///         // NumType can be used to reference the resolved type
-///         // For x=3, NumType is typenum::consts::U3
 ///         use typenum::ToInt;
 ///         let num: usize = NumType::to_int();
 ///         assert_eq!(num, 3);
