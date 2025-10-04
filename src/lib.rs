@@ -17,6 +17,7 @@ enum UType {
     U,
     False,
     None,
+    Literal(isize),
 }
 
 impl std::fmt::Display for UType {
@@ -27,6 +28,7 @@ impl std::fmt::Display for UType {
             UType::U => write!(f, "U"),
             UType::False => write!(f, "False"),
             UType::None => write!(f, ""),
+            UType::Literal(_) => write!(f, ""),
         }
     }
 }
@@ -81,6 +83,14 @@ impl Parse for UNumIt {
                         ))
                     }
                 },
+                Pat::Lit(lit_expr) => {
+                    // Parse literal numbers in match arms
+                    let lit_str = lit_expr.to_token_stream().to_string();
+                    let value = lit_str.parse::<isize>().map_err(|e| {
+                        syn::Error::new(lit_expr.span(), format!("invalid literal: {e}"))
+                    })?;
+                    UType::Literal(value)
+                }
                 Pat::Wild(_) => UType::None,
                 _ => return Err(syn::Error::new(arm.pat.span(), "exepected ident")),
             };
@@ -94,6 +104,14 @@ impl Parse for UNumIt {
             return Err(syn::Error::new(
                 matcher.span(),
                 "ambiguous type, don't use P and U in the same macro call",
+            ));
+        }
+
+        // Check for conflict between literal 0 and False (they represent the same value in typenum)
+        if arms.get(&UType::Literal(0)).and(arms.get(&UType::False)).is_some() {
+            return Err(syn::Error::new(
+                matcher.span(),
+                "ambiguous type, don't use literal 0 and False in the same macro call (they represent the same value)",
             ));
         }
 
@@ -127,6 +145,19 @@ fn make_body_variant(body: TokenStream, type_variant: TokenStream, u_type: UType
 }
 
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
+    let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
+    
+    // For literal types, use the body as-is without type replacement
+    if let UType::Literal(_) = u_type {
+        let body_tokens = body.to_token_stream();
+        return quote! {
+            #match_expr => {
+                #body_tokens
+            },
+        };
+    }
+    
+    // For type patterns (N, P, U, False), perform type replacement
     let i_str = if *i != 0 {
         i.abs().to_string()
     } else {
@@ -138,7 +169,6 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     ));
     let type_variant = quote!(typenum::consts::#typenum_type);
     let body_variant = make_body_variant(body.to_token_stream(), type_variant, u_type);
-    let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
 
     quote! {
         #match_expr => {
@@ -172,23 +202,31 @@ pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let pos_u = arms.get(&UType::U).is_some();
 
-    let expanded_arms = range.iter().filter_map(|i| match i {
-        0 => arms
-            .get(&UType::False)
-            .map(|body| make_match_arm(i, body, UType::False)),
-        i if *i < 0 => arms
-            .get(&UType::N)
-            .map(|body| make_match_arm(i, body, UType::N)),
-        i if *i > 0 => {
-            if pos_u {
-                arms.get(&UType::U)
-                    .map(|body| make_match_arm(i, body, UType::U))
-            } else {
-                arms.get(&UType::P)
-                    .map(|body| make_match_arm(i, body, UType::P))
-            }
+    let expanded_arms = range.iter().filter_map(|i| {
+        // First check if there's a specific literal match for this number
+        if let Some(body) = arms.get(&UType::Literal(*i)) {
+            return Some(make_match_arm(i, body, UType::Literal(*i)));
         }
-        _ => unreachable!(),
+        
+        // Otherwise, use the general type patterns
+        match i {
+            0 => arms
+                .get(&UType::False)
+                .map(|body| make_match_arm(i, body, UType::False)),
+            i if *i < 0 => arms
+                .get(&UType::N)
+                .map(|body| make_match_arm(i, body, UType::N)),
+            i if *i > 0 => {
+                if pos_u {
+                    arms.get(&UType::U)
+                        .map(|body| make_match_arm(i, body, UType::U))
+                } else {
+                    arms.get(&UType::P)
+                        .map(|body| make_match_arm(i, body, UType::P))
+                }
+            }
+            _ => unreachable!(),
+        }
     });
 
     let fallback = arms

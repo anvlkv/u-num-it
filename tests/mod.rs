@@ -43,3 +43,45 @@ fn i_macro_test() {
         }
     }
 }
+
+#[test]
+fn literal_match_test() {
+    // Test positive literal
+    let result_positive = u_num_it! {
+        -10..=10,
+        match 5 {
+            5 => "matched positive 5",
+            N => "negative",
+            P => "other positive",
+            False => "zero",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result_positive, "matched positive 5");
+
+    // Test negative literal
+    let result_negative = u_num_it! {
+        -10..=10,
+        match -3 {
+            -3 => "matched negative 3",
+            N => "other negative",
+            P => "positive",
+            False => "zero",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result_negative, "matched negative 3");
+
+    // Test zero literal
+    let result_zero = u_num_it! {
+        -10..=10,
+        match 0 {
+            0 => "matched zero",
+            N => "negative",
+            P => "positive",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result_zero, "matched zero");
+}
+
