@@ -168,10 +168,11 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
         Span::mixed_site(),
     ));
     let type_variant = quote!(typenum::consts::#typenum_type);
-    let body_variant = make_body_variant(body.to_token_stream(), type_variant, u_type);
+    let body_variant = make_body_variant(body.to_token_stream(), type_variant.clone(), u_type);
 
     quote! {
         #match_expr => {
+            type NumType = #type_variant;
             #body_variant
         },
     }
@@ -183,6 +184,9 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///
 /// use `P` | `N` | `U` | `False` | `_` as match arms
 ///
+/// As of version 0.2.1, a `NumType` type alias is available in each match arm,
+/// resolving to the specific typenum type for that value.
+///
 /// ## Example
 ///
 /// ```
@@ -193,6 +197,12 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///         let val = U::new();
 ///         println!("{:?}", val);
 ///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
+///         
+///         // NumType can be used to reference the resolved type
+///         // For x=3, NumType is typenum::consts::U3
+///         use typenum::ToInt;
+///         let num: usize = NumType::to_int();
+///         assert_eq!(num, 3);
 ///     }
 /// })
 /// ```

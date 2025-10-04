@@ -85,3 +85,31 @@ fn literal_match_test() {
     assert_eq!(result_zero, "matched zero");
 }
 
+#[test]
+fn num_type_test() {
+    // Test that NumType is available in the match arms
+    for i in -5..5 {
+        u_num_it! {
+            -5..5,
+            match i {
+                N => {
+                    // NumType should be the resolved typenum type
+                    let inner: i32 = NumType::to_int();
+                    assert_eq!(inner, i);
+                    assert!(inner < 0);
+                },
+                P => {
+                    let inner: i32 = NumType::to_int();
+                    assert_eq!(inner, i);
+                    assert!(inner > 0);
+                },
+                False => {
+                    let inner: u8 = NumType::to_u8();
+                    assert_eq!(inner, i as u8);
+                    assert!(inner == 0);
+                }
+            }
+        }
+    }
+}
+
