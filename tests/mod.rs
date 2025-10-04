@@ -79,7 +79,6 @@ fn literal_match_test() {
             0 => "matched zero",
             N => "negative",
             P => "positive",
-            False => "other zero",
             _ => "fallback"
         }
     };

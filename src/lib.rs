@@ -107,6 +107,14 @@ impl Parse for UNumIt {
             ));
         }
 
+        // Check for conflict between literal 0 and False (they represent the same value in typenum)
+        if arms.get(&UType::Literal(0)).and(arms.get(&UType::False)).is_some() {
+            return Err(syn::Error::new(
+                matcher.span(),
+                "ambiguous type, don't use literal 0 and False in the same macro call (they represent the same value)",
+            ));
+        }
+
         let expr = matcher.expr;
 
         Ok(UNumIt { range, arms, expr })
