@@ -111,5 +111,23 @@ fn num_type_test() {
             }
         }
     }
+    
+    // Test literal case with NumType
+    let result = u_num_it! {
+        -10..=10,
+        match 5 {
+            5 => {
+                // NumType should be typenum::consts::P5
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 5);
+                "matched literal with NumType"
+            },
+            N => "negative",
+            P => "other positive",
+            False => "zero",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result, "matched literal with NumType");
 }
 

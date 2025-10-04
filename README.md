@@ -61,28 +61,20 @@ match x {
 }
 ```
 
-## NumType
-
-As of version 0.2.1, each match arm includes a `NumType` type alias that resolves to the specific typenum type for that value. This allows you to reference the resolved type directly:
+`NumType` is available inside each match arm:
 
 ```rust
-let x = 3;
-
 u_num_it!(-5..5, match x {
     N => {
-        // NumType is typenum::consts::N3 when x is -3
-        let val: i32 = NumType::to_int();
-        println!("Negative: {}", val);
+        N::new()
+    },
+    False => {
+        False::new()
     },
     P => {
         // NumType is typenum::consts::P3 when x is 3
         let val: i32 = NumType::to_int();
-        println!("Positive: {}", val);
-    },
-    False => {
-        // NumType is typenum::consts::False when x is 0
-        let val: u8 = NumType::to_u8();
-        println!("Zero: {}", val);
+        val
     }
 })
 ```

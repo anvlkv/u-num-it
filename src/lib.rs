@@ -147,27 +147,39 @@ fn make_body_variant(body: TokenStream, type_variant: TokenStream, u_type: UType
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
     
+    // Determine the typenum type for all cases
+    let i_str = if *i != 0 {
+        i.abs().to_string()
+    } else {
+        Default::default()
+    };
+    
+    // Determine the type variant based on UType
+    let u_type_for_typenum = match u_type {
+        UType::Literal(val) if val == 0 => UType::False,
+        UType::Literal(val) if val < 0 => UType::N,
+        UType::Literal(val) if val > 0 => UType::P,
+        _ => u_type,
+    };
+    
+    let typenum_type = TokenTree::Ident(Ident::new(
+        format!("{}{}", u_type_for_typenum, i_str).as_str(),
+        Span::mixed_site(),
+    ));
+    let type_variant = quote!(typenum::consts::#typenum_type);
+    
     // For literal types, use the body as-is without type replacement
     if let UType::Literal(_) = u_type {
         let body_tokens = body.to_token_stream();
         return quote! {
             #match_expr => {
+                type NumType = #type_variant;
                 #body_tokens
             },
         };
     }
     
     // For type patterns (N, P, U, False), perform type replacement
-    let i_str = if *i != 0 {
-        i.abs().to_string()
-    } else {
-        Default::default()
-    };
-    let typenum_type = TokenTree::Ident(Ident::new(
-        format!("{}{}", u_type, i_str).as_str(),
-        Span::mixed_site(),
-    ));
-    let type_variant = quote!(typenum::consts::#typenum_type);
     let body_variant = make_body_variant(body.to_token_stream(), type_variant.clone(), u_type);
 
     quote! {
