@@ -9,13 +9,13 @@ let x:isize = 3;
 
 u_num_it!(-5..5, match x {
     N => {
-        N::new()
+        NumType::new()
     },
     False => {
-        False::new()
+        NumType::new()
     },
     P => {
-        P::new()
+        NumType::new()
     }
 })
 ```
@@ -59,4 +59,22 @@ match x {
         panic!()
     }
 }
+```
+
+`NumType` is available inside each match arm:
+
+```rust
+u_num_it!(-5..5, match x {
+    N => {
+        NumType::new()
+    },
+    False => {
+        NumType::new()
+    },
+    P => {
+        // NumType is typenum::consts::P3 when x is 3
+        let val: i32 = NumType::to_int();
+        val
+    }
+})
 ```
