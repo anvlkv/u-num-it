@@ -6,7 +6,7 @@ use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 
 use quote::{quote, ToTokens};
 use syn::{
-    parse::Parse, parse_macro_input, spanned::Spanned, Expr, ExprMatch, Ident, Pat, PatRange,
+    parse::Parse, parse_macro_input, spanned::Spanned, Expr, ExprArray, ExprMatch, Ident, Pat, PatRange,
     RangeLimits, Token,
 };
 
@@ -54,14 +54,24 @@ fn range_boundary(val: &Option<Box<Expr>>) -> syn::Result<Option<isize>> {
 
 impl Parse for UNumIt {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let range: PatRange = input.parse()?;
-
-        let start = range_boundary(&range.start)?.unwrap_or(0);
-        let end = range_boundary(&range.end)?.unwrap_or(isize::MAX);
-
-        let range = match &range.limits {
-            RangeLimits::HalfOpen(_) => (start..end).collect(),
-            RangeLimits::Closed(_) => (start..=end).collect(),
+        // Try to parse as array first, then fallback to range
+        let range: Vec<isize> = if input.peek(syn::token::Bracket) {
+            // Parse array syntax: [1, 2, 8, 22]
+            let array: ExprArray = input.parse()?;
+            array.elems.iter().map(|expr| {
+                let string = expr.to_token_stream().to_string().replace(' ', "");
+                string.parse::<isize>()
+                    .map_err(|e| syn::Error::new(expr.span(), format!("invalid number in array: {e}")))
+            }).collect::<syn::Result<Vec<isize>>>()?
+        } else {
+            // Parse range syntax: 1..10 or 1..=10
+            let range: PatRange = input.parse()?;
+            let start = range_boundary(&range.start)?.unwrap_or(0);
+            let end = range_boundary(&range.end)?.unwrap_or(isize::MAX);
+            match &range.limits {
+                RangeLimits::HalfOpen(_) => (start..end).collect(),
+                RangeLimits::Closed(_) => (start..=end).collect(),
+            }
         };
 
         input.parse::<Token![,]>()?;
@@ -156,9 +166,9 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     }
 }
 
-/// matches `typenum::consts` in a given range
+/// matches `typenum::consts` in a given range or array
 ///
-/// use with an open or closed range
+/// use with an open or closed range, or an array of arbitrary numbers
 ///
 /// use `P` | `N` | `U` | `False` | `_` or literals `1` | `-1` as match arms
 ///
@@ -166,7 +176,7 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 /// resolving to the specific typenum type for that value.
 /// Use `NumType` to reference the resolved type in the match arm body.
 ///
-/// ## Example
+/// ## Example (range)
 ///
 /// ```
 /// let x = 3;
@@ -181,6 +191,21 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///         use typenum::ToInt;
 ///         let num: usize = NumType::to_int();
 ///         assert_eq!(num, 3);
+///     }
+/// })
+/// ```
+///
+/// ## Example (array)
+///
+/// ```
+/// let x = 8;
+///
+/// u_num_it::u_num_it!([1, 2, 8, 22], match x {
+///     P => {
+///         // NumType is typenum::consts::P8 when x=8
+///         use typenum::ToInt;
+///         let num: i32 = NumType::to_int();
+///         assert_eq!(num, 8);
 ///     }
 /// })
 /// ```

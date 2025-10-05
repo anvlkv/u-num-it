@@ -131,3 +131,50 @@ fn num_type_test() {
     assert_eq!(result, "matched literal with NumType");
 }
 
+#[test]
+fn array_syntax_test() {
+    // Test array syntax with arbitrary numbers
+    let result = u_num_it! {
+        [1, 2, 8, 22],
+        match 8 {
+            P => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 8);
+                "matched 8"
+            },
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result, "matched 8");
+
+    // Test array with negative numbers
+    let result_neg = u_num_it! {
+        [-5, -2, 3, 10],
+        match -2 {
+            N => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, -2);
+                "matched -2"
+            },
+            P => "positive",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result_neg, "matched -2");
+
+    // Test array with literal match
+    let result_literal = u_num_it! {
+        [1, 2, 8, 22],
+        match 22 {
+            22 => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 22);
+                "matched literal 22"
+            },
+            P => "other positive",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(result_literal, "matched literal 22");
+}
+

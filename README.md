@@ -1,6 +1,6 @@
 # u-num-it
 
-A simple procedural macros for matching `typenum::consts` in a given range.
+A simple procedural macros for matching `typenum::consts` in a given range or array.
 
 Helps you to write
 
@@ -17,6 +17,19 @@ u_num_it!(-5..5, match x {
     P => {
         NumType::new()
     }
+})
+```
+
+or with an array of arbitrary numbers:
+
+```rust
+let x:isize = 8;
+
+u_num_it!([1, 2, 8, 22], match x {
+    P => {
+        NumType::new()
+    },
+    _ => panic!()
 })
 ```
 
