@@ -1,6 +1,6 @@
 [package]
 name = "u-num-it"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 rust-version = "1.67"
 description = "typenum macro for matching types from a given range"

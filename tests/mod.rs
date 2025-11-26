@@ -11,7 +11,7 @@ fn u_macro_test() {
             match i {
                 U => {
                     let inner: usize = NumType::to_int();
-                    assert_eq!(inner, i);
+                    assert_eq!(inner, i as usize);
                 }
             }
         }
@@ -26,12 +26,12 @@ fn i_macro_test() {
             match i {
                 N => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i);
+                    assert_eq!(inner, i as i32);
                     assert!(inner < 0);
                 },
                 P => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i);
+                    assert_eq!(inner, i as i32);
                     assert!(inner > 0);
                 },
                 False => {
@@ -41,6 +41,35 @@ fn i_macro_test() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn i_macro_test_round() {
+    for i in -5..5 {
+        u_num_it!(
+            -5..5,
+            match i {
+                N => {
+                    let inner: i32 = NumType::to_int();
+                    assert_eq!(inner, i as i32);
+                    assert!(inner < 0);
+                }
+                P => {
+                    let inner: i32 = NumType::to_int();
+                    assert_eq!(inner, i as i32);
+                    assert!(inner > 0);
+                }
+                False => {
+                    let inner: u8 = NumType::to_u8();
+                    assert_eq!(inner, i as u8);
+                    assert!(inner == 0);
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+        );
     }
 }
 
@@ -95,12 +124,12 @@ fn num_type_test() {
                 N => {
                     // NumType should be the resolved typenum type
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i);
+                    assert_eq!(inner, i as i32);
                     assert!(inner < 0);
                 },
                 P => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i);
+                    assert_eq!(inner, i as i32);
                     assert!(inner > 0);
                 },
                 False => {
@@ -111,7 +140,7 @@ fn num_type_test() {
             }
         }
     }
-    
+
     // Test literal case with NumType
     let result = u_num_it! {
         -10..=10,
@@ -129,6 +158,72 @@ fn num_type_test() {
         }
     };
     assert_eq!(result, "matched literal with NumType");
+}
+
+#[test]
+fn underscore_literal_test() {
+    // Positive underscore literal
+    let pos = u_num_it! {
+        999..=1001,
+        match 1_000 {
+            1000 => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 1000);
+                "matched 1000"
+            },
+            P => "other positive",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(pos, "matched 1000");
+
+    // Negative underscore literal
+    let neg = u_num_it! {
+        -1001..=-999,
+        match -1_000 {
+            -1000 => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, -1000);
+                "matched -1000"
+            },
+            N => "other negative",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(neg, "matched -1000");
+}
+
+#[test]
+fn array_dedup_test() {
+    // Ensure duplicates in array do not cause duplicate pattern errors and literal precedence works
+    let one = u_num_it! {
+        [1, 1, 2],
+        match 1 {
+            1 => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 1);
+                "one"
+            },
+            P => "positive",
+            _ => "fallback"
+        }
+    };
+    assert_eq!(one, "one");
+
+    // Match the second distinct value with general positive arm
+    let two = u_num_it! {
+        [1, 1, 2],
+        match 2 {
+            1 => "one",
+            P => {
+                let val: i32 = NumType::to_int();
+                assert_eq!(val, 2);
+                "two"
+            },
+            _ => "fallback"
+        }
+    };
+    assert_eq!(two, "two");
 }
 
 #[test]
@@ -177,4 +272,3 @@ fn array_syntax_test() {
     };
     assert_eq!(result_literal, "matched literal 22");
 }
-

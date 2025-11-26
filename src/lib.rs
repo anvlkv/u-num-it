@@ -1,8 +1,8 @@
 extern crate proc_macro;
 
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
-use proc_macro2::{Literal, Span, TokenStream, TokenTree};
+use proc_macro2::{Span, TokenStream, TokenTree};
 
 use quote::{quote, ToTokens};
 use syn::{
@@ -58,16 +58,23 @@ impl Parse for UNumIt {
         let range: Vec<isize> = if input.peek(syn::token::Bracket) {
             // Parse array syntax: [1, 2, 8, 22]
             let array: ExprArray = input.parse()?;
-            array
+            let mut vals = array
                 .elems
                 .iter()
                 .map(|expr| {
-                    let string = expr.to_token_stream().to_string().replace(' ', "");
-                    string.parse::<isize>().map_err(|e| {
-                        syn::Error::new(expr.span(), format!("invalid number in array: {e}"))
+                    let raw = expr.to_token_stream().to_string();
+                    let norm = raw.replace([' ', '_'], "");
+                    norm.parse::<isize>().map_err(|e| {
+                        syn::Error::new(
+                            expr.span(),
+                            format!("invalid number in array: {e}: `{raw}` (normalized `{norm}`)"),
+                        )
                     })
                 })
-                .collect::<syn::Result<Vec<isize>>>()?
+                .collect::<syn::Result<Vec<isize>>>()?;
+            vals.sort();
+            vals.dedup();
+            vals
         } else {
             // Parse range syntax: 1..10 or 1..=10
             let range: PatRange = input.parse()?;
@@ -94,20 +101,30 @@ impl Parse for UNumIt {
                     _ => {
                         return Err(syn::Error::new(
                             t.span(),
-                            "exepected idents N | P | U, False or _",
+                            "expected idents N | P | U | False | _",
                         ))
                     }
                 },
                 Pat::Lit(lit_expr) => {
-                    // Parse literal numbers in match arms
-                    let lit_str = lit_expr.to_token_stream().to_string();
-                    let value = lit_str.parse::<isize>().map_err(|e| {
-                        syn::Error::new(lit_expr.span(), format!("invalid literal: {e}"))
+                    // Parse literal numbers in match arms (normalize spaces & underscores; base-10 only)
+                    let raw = lit_expr.to_token_stream().to_string();
+                    let norm = raw.replace([' ', '_'], "");
+                    if norm.starts_with("0x") || norm.starts_with("0b") || norm.starts_with("0o") {
+                        return Err(syn::Error::new(
+                            lit_expr.span(),
+                            format!("unsupported non-decimal literal `{raw}`"),
+                        ));
+                    }
+                    let value = norm.parse::<isize>().map_err(|e| {
+                        syn::Error::new(
+                            lit_expr.span(),
+                            format!("invalid literal: {e}: `{raw}` (normalized `{norm}`)"),
+                        )
                     })?;
                     UType::Literal(value)
                 }
                 Pat::Wild(_) => UType::None,
-                _ => return Err(syn::Error::new(arm.pat.span(), "exepected ident")),
+                _ => return Err(syn::Error::new(arm.pat.span(), "expected ident")),
             };
             let arm_expr = arm.body.clone();
             if arms.insert(u_type, arm_expr.clone()).is_some() {
@@ -141,7 +158,7 @@ impl Parse for UNumIt {
 }
 
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
-    let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
+    let match_expr = quote!(#i);
 
     // Determine the typenum type for all cases
     let i_str = if *i != 0 {
@@ -218,6 +235,21 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///     }
 /// })
 /// ```
+///
+/// ## Example (negative literal)
+/// ```
+/// let result = u_num_it::u_num_it!(-5..=5, match -3 {
+///     -3 => {
+///         use typenum::ToInt;
+///         let n: i32 = NumType::to_int();
+///         assert_eq!(n, -3);
+///         "ok"
+///     },
+///     N => "neg",
+///     _ => "other"
+/// });
+/// assert_eq!(result, "ok");
+/// ```
 #[proc_macro]
 pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let UNumIt { range, arms, expr } = parse_macro_input!(tokens as UNumIt);
@@ -257,14 +289,14 @@ pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
             quote! {
                 _ => {
                     #body
-                }
+                },
             }
         })
         .unwrap_or_else(|| {
             let first = range.first().unwrap_or(&0);
             let last = range.last().unwrap_or(&0);
             quote! {
-                i => unreachable!("{i} is not in range {}-{:?}", #first, #last)
+                i => unreachable!("{i} not in range {}..={}", #first, #last),
             }
         });
 
