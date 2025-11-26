@@ -1,14 +1,134 @@
+#![doc = include_str!("../README.md")]
+
 extern crate proc_macro;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 
 use quote::{quote, ToTokens};
 use syn::{
     parse::Parse, parse_macro_input, spanned::Spanned, Expr, ExprArray, ExprMatch, Ident, Pat,
     PatRange, RangeLimits, Token,
 };
+
+/// matches `typenum::consts` in a given range or array
+///
+/// use with an open or closed range, or an array of arbitrary numbers
+///
+/// use `P` | `N` | `U` | `False` | `_` or literals `1` | `-1` as match arms
+///
+/// a `NumType` type alias is available in each match arm,
+/// resolving to the specific typenum type for that value.
+/// Use `NumType` to reference the resolved type in the match arm body.
+///
+/// ## Example (range)
+///
+/// ```
+/// let x = 3;
+///
+/// u_num_it::u_num_it!(1..10, match x {
+///     U => {
+///         // NumType is typenum::consts::U3 when x=3
+///         let val = NumType::new();
+///         println!("{:?}", val);
+///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
+///
+///         use typenum::ToInt;
+///         let num: usize = NumType::to_int();
+///         assert_eq!(num, 3);
+///     }
+/// })
+/// ```
+///
+/// ## Example (array)
+///
+/// ```
+/// let x = 8;
+///
+/// u_num_it::u_num_it!([1, 2, 8, 22], match x {
+///     P => {
+///         // NumType is typenum::consts::P8 when x=8
+///         use typenum::ToInt;
+///         let num: i32 = NumType::to_int();
+///         assert_eq!(num, 8);
+///     }
+/// })
+/// ```
+///
+/// ## Example (negative literal)
+/// ```
+/// let result = u_num_it::u_num_it!(-5..=5, match -3 {
+///     -3 => {
+///         use typenum::ToInt;
+///         let n: i32 = NumType::to_int();
+///         assert_eq!(n, -3);
+///         "ok"
+///     },
+///     N => "neg",
+///     _ => "other"
+/// });
+/// assert_eq!(result, "ok");
+/// ```
+#[proc_macro]
+pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let UNumIt { range, arms, expr } = parse_macro_input!(tokens as UNumIt);
+
+    let pos_u = arms.contains_key(&UType::U);
+
+    let expanded_arms = range.iter().filter_map(|i| {
+        // First check if there's a specific literal match for this number
+        if let Some(body) = arms.get(&UType::Literal(*i)) {
+            return Some(make_match_arm(i, body, UType::Literal(*i)));
+        }
+
+        // Otherwise, use the general type patterns
+        match i {
+            0 => arms
+                .get(&UType::False)
+                .map(|body| make_match_arm(i, body, UType::False)),
+            i if *i < 0 => arms
+                .get(&UType::N)
+                .map(|body| make_match_arm(i, body, UType::N)),
+            i if *i > 0 => {
+                if pos_u {
+                    arms.get(&UType::U)
+                        .map(|body| make_match_arm(i, body, UType::U))
+                } else {
+                    arms.get(&UType::P)
+                        .map(|body| make_match_arm(i, body, UType::P))
+                }
+            }
+            _ => unreachable!(),
+        }
+    });
+
+    let fallback = arms
+        .get(&UType::None)
+        .map(|body| {
+            quote! {
+                _ => {
+                    #body
+                },
+            }
+        })
+        .unwrap_or_else(|| {
+            let first = range.first().unwrap_or(&0);
+            let last = range.last().unwrap_or(&0);
+            quote! {
+                i => unreachable!("{i} not in range {}..={}", #first, #last),
+            }
+        });
+
+    let expanded = quote! {
+        match #expr {
+            #(#expanded_arms)*
+            #fallback
+        }
+    };
+
+    proc_macro::TokenStream::from(expanded)
+}
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 enum UType {
@@ -158,7 +278,7 @@ impl Parse for UNumIt {
 }
 
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
-    let match_expr = quote!(#i);
+    let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
 
     // Determine the typenum type for all cases
     let i_str = if *i != 0 {
@@ -190,122 +310,4 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
             #body_tokens
         },
     }
-}
-
-/// matches `typenum::consts` in a given range or array
-///
-/// use with an open or closed range, or an array of arbitrary numbers
-///
-/// use `P` | `N` | `U` | `False` | `_` or literals `1` | `-1` as match arms
-///
-/// a `NumType` type alias is available in each match arm,
-/// resolving to the specific typenum type for that value.
-/// Use `NumType` to reference the resolved type in the match arm body.
-///
-/// ## Example (range)
-///
-/// ```
-/// let x = 3;
-///
-/// u_num_it::u_num_it!(1..10, match x {
-///     U => {
-///         // NumType is typenum::consts::U3 when x=3
-///         let val = NumType::new();
-///         println!("{:?}", val);
-///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
-///
-///         use typenum::ToInt;
-///         let num: usize = NumType::to_int();
-///         assert_eq!(num, 3);
-///     }
-/// })
-/// ```
-///
-/// ## Example (array)
-///
-/// ```
-/// let x = 8;
-///
-/// u_num_it::u_num_it!([1, 2, 8, 22], match x {
-///     P => {
-///         // NumType is typenum::consts::P8 when x=8
-///         use typenum::ToInt;
-///         let num: i32 = NumType::to_int();
-///         assert_eq!(num, 8);
-///     }
-/// })
-/// ```
-///
-/// ## Example (negative literal)
-/// ```
-/// let result = u_num_it::u_num_it!(-5..=5, match -3 {
-///     -3 => {
-///         use typenum::ToInt;
-///         let n: i32 = NumType::to_int();
-///         assert_eq!(n, -3);
-///         "ok"
-///     },
-///     N => "neg",
-///     _ => "other"
-/// });
-/// assert_eq!(result, "ok");
-/// ```
-#[proc_macro]
-pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let UNumIt { range, arms, expr } = parse_macro_input!(tokens as UNumIt);
-
-    let pos_u = arms.contains_key(&UType::U);
-
-    let expanded_arms = range.iter().filter_map(|i| {
-        // First check if there's a specific literal match for this number
-        if let Some(body) = arms.get(&UType::Literal(*i)) {
-            return Some(make_match_arm(i, body, UType::Literal(*i)));
-        }
-
-        // Otherwise, use the general type patterns
-        match i {
-            0 => arms
-                .get(&UType::False)
-                .map(|body| make_match_arm(i, body, UType::False)),
-            i if *i < 0 => arms
-                .get(&UType::N)
-                .map(|body| make_match_arm(i, body, UType::N)),
-            i if *i > 0 => {
-                if pos_u {
-                    arms.get(&UType::U)
-                        .map(|body| make_match_arm(i, body, UType::U))
-                } else {
-                    arms.get(&UType::P)
-                        .map(|body| make_match_arm(i, body, UType::P))
-                }
-            }
-            _ => unreachable!(),
-        }
-    });
-
-    let fallback = arms
-        .get(&UType::None)
-        .map(|body| {
-            quote! {
-                _ => {
-                    #body
-                },
-            }
-        })
-        .unwrap_or_else(|| {
-            let first = range.first().unwrap_or(&0);
-            let last = range.last().unwrap_or(&0);
-            quote! {
-                i => unreachable!("{i} not in range {}..={}", #first, #last),
-            }
-        });
-
-    let expanded = quote! {
-        match #expr {
-            #(#expanded_arms)*
-            #fallback
-        }
-    };
-
-    proc_macro::TokenStream::from(expanded)
 }

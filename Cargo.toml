@@ -1,8 +1,7 @@
 [package]
 name = "u-num-it"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
-rust-version = "1.67"
 description = "typenum macro for matching types from a given range"
 repository = "https://github.com/anvlkv/u-num-it"
 license = "Unlicense"

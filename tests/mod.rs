@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate u_num_it;
 
-use typenum::{Bit, ToInt};
+use typenum::{Bit, ToInt, Unsigned};
 
 #[test]
 fn u_macro_test() {
@@ -26,12 +26,12 @@ fn i_macro_test() {
             match i {
                 N => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner < 0);
                 },
                 P => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner > 0);
                 },
                 False => {
@@ -52,12 +52,12 @@ fn i_macro_test_round() {
             match i {
                 N => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner < 0);
                 }
                 P => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner > 0);
                 }
                 False => {
@@ -124,12 +124,12 @@ fn num_type_test() {
                 N => {
                     // NumType should be the resolved typenum type
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner < 0);
                 },
                 P => {
                     let inner: i32 = NumType::to_int();
-                    assert_eq!(inner, i as i32);
+                    assert_eq!(inner, i);
                     assert!(inner > 0);
                 },
                 False => {
@@ -271,4 +271,43 @@ fn array_syntax_test() {
         }
     };
     assert_eq!(result_literal, "matched literal 22");
+}
+
+#[test]
+fn additional_cases() {
+    let index = 4;
+    u_num_it!(
+        3..=4,
+        match index {
+            U => {
+                type FNum = NumType;
+                assert_eq!(FNum::USIZE, 4);
+            }
+            _ => {
+                panic!("unexpected number of filters");
+            }
+        }
+    );
+
+    let i: usize = u_num_it!(
+        [2, 4],
+        match index {
+            U => {
+                type GNum = NumType;
+
+                u_num_it!(
+                    [2, 4,],
+                    match index {
+                        U => {
+                            type HNum = NumType;
+                            type KNum = typenum::op!(GNum * HNum);
+                            KNum::USIZE
+                        }
+                    }
+                )
+            }
+        }
+    );
+
+    assert_eq!(i, 16);
 }
