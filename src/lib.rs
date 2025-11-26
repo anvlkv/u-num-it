@@ -6,8 +6,8 @@ use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 
 use quote::{quote, ToTokens};
 use syn::{
-    parse::Parse, parse_macro_input, spanned::Spanned, Expr, ExprArray, ExprMatch, Ident, Pat, PatRange,
-    RangeLimits, Token,
+    parse::Parse, parse_macro_input, spanned::Spanned, Expr, ExprArray, ExprMatch, Ident, Pat,
+    PatRange, RangeLimits, Token,
 };
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
@@ -58,11 +58,16 @@ impl Parse for UNumIt {
         let range: Vec<isize> = if input.peek(syn::token::Bracket) {
             // Parse array syntax: [1, 2, 8, 22]
             let array: ExprArray = input.parse()?;
-            array.elems.iter().map(|expr| {
-                let string = expr.to_token_stream().to_string().replace(' ', "");
-                string.parse::<isize>()
-                    .map_err(|e| syn::Error::new(expr.span(), format!("invalid number in array: {e}")))
-            }).collect::<syn::Result<Vec<isize>>>()?
+            array
+                .elems
+                .iter()
+                .map(|expr| {
+                    let string = expr.to_token_stream().to_string().replace(' ', "");
+                    string.parse::<isize>().map_err(|e| {
+                        syn::Error::new(expr.span(), format!("invalid number in array: {e}"))
+                    })
+                })
+                .collect::<syn::Result<Vec<isize>>>()?
         } else {
             // Parse range syntax: 1..10 or 1..=10
             let range: PatRange = input.parse()?;
@@ -118,7 +123,11 @@ impl Parse for UNumIt {
         }
 
         // Check for conflict between literal 0 and False (they represent the same value in typenum)
-        if arms.get(&UType::Literal(0)).and(arms.get(&UType::False)).is_some() {
+        if arms
+            .get(&UType::Literal(0))
+            .and(arms.get(&UType::False))
+            .is_some()
+        {
             return Err(syn::Error::new(
                 matcher.span(),
                 "ambiguous type, don't use literal 0 and False in the same macro call (they represent the same value)",
@@ -133,31 +142,31 @@ impl Parse for UNumIt {
 
 fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
     let match_expr = TokenTree::Literal(Literal::from_str(i.to_string().as_str()).unwrap());
-    
+
     // Determine the typenum type for all cases
     let i_str = if *i != 0 {
         i.abs().to_string()
     } else {
         Default::default()
     };
-    
+
     // Determine the type variant based on UType
     let u_type_for_typenum = match u_type {
-        UType::Literal(val) if val == 0 => UType::False,
+        UType::Literal(0) => UType::False,
         UType::Literal(val) if val < 0 => UType::N,
         UType::Literal(val) if val > 0 => UType::P,
         _ => u_type,
     };
-    
+
     let typenum_type = TokenTree::Ident(Ident::new(
         format!("{}{}", u_type_for_typenum, i_str).as_str(),
         Span::mixed_site(),
     ));
     let type_variant = quote!(typenum::consts::#typenum_type);
-    
+
     // All match arms get NumType and use body as-is (no pattern replacement)
     let body_tokens = body.to_token_stream();
-    
+
     quote! {
         #match_expr => {
             type NumType = #type_variant;
@@ -187,7 +196,7 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 ///         let val = NumType::new();
 ///         println!("{:?}", val);
 ///         // UInt { msb: UInt { msb: UTerm, lsb: B1 }, lsb: B1 }
-///         
+///
 ///         use typenum::ToInt;
 ///         let num: usize = NumType::to_int();
 ///         assert_eq!(num, 3);
@@ -213,14 +222,14 @@ fn make_match_arm(i: &isize, body: &Expr, u_type: UType) -> TokenStream {
 pub fn u_num_it(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let UNumIt { range, arms, expr } = parse_macro_input!(tokens as UNumIt);
 
-    let pos_u = arms.get(&UType::U).is_some();
+    let pos_u = arms.contains_key(&UType::U);
 
     let expanded_arms = range.iter().filter_map(|i| {
         // First check if there's a specific literal match for this number
         if let Some(body) = arms.get(&UType::Literal(*i)) {
             return Some(make_match_arm(i, body, UType::Literal(*i)));
         }
-        
+
         // Otherwise, use the general type patterns
         match i {
             0 => arms
